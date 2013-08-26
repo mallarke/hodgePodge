@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+
+import os
+import re
+import sys
+
+#error codes
+
+UNKNOWN_ERROR = 4
+UNCOMMITED_CHANES = 5 
+UNKNOWN_BRANCH = 6 
+
+#static values
+MASTER = "master"
+
+def canStart():
+	if (len(sys.argv) == 1):
+		return UNKNOWN_BRANCH
+
+	output = os.popen("git status")
+	for i in output.readlines():
+		if "modified" in i:
+			return UNCOMMITED_CHANES
+		
+	return 0
+
+def exit(code=UNKNOWN_ERROR):
+	message = None
+
+	if code == UNCOMMITED_CHANES:
+		print "you need to let me know what branch you would like to merge."
+		sys.exit(UNCOMMITED_CHANES)
+
+	if code == UNKNOWN_BRANCH:
+		print "You have uncommited items.  add and commit your items first."
+		sys.exit(UNKNOWN_BRANCH)
+
+	print "unkown error occured."
+	sys.exit(UNKNOWN_ERROR)
+
+class GitMerge:
+	def __init__(self):
+		self.branchName = sys.argv[1]
+
+	def start(self):
+		self.switchToMaster()
+		os.system("git pull origin master")
+		self.switchToBranch()
+		self.rebase(False)
+
+		while(True):
+			items = self.readStatus()
+			if items == None:
+				print "no items found. continuing with the rebase and merge"
+				break
+			else:
+				self.openFiles(items)
+				os.system("git add -A")
+				os.system("git rebase --continue")
+
+		os.system("git push --force origin {0}".format(self.branchName))
+		self.switchToMaster()
+		os.system("git merge {0}".format(self.branchName))
+		os.system("git push")
+		self.switchToBranch()
+
+	def switchTo(self, branch):
+		os.system("git checkout {0}".format(branch))
+
+	def switchToMaster(self):
+		self.switchTo(MASTER)
+
+	def switchToBranch(self):
+		self.switchTo(self.branchName)
+
+	def rebase(self, shouldContinue=True):
+		if shouldContinue:
+			os.system("git rebase --continue")
+			return
+
+		os.system("git rebase -i origin/master")
+
+	def readStatus(self):
+		output = os.popen("git status")
+		items = []
+
+		for line in output.readlines():
+			item = ConflictItem(line)
+			if item.hasConflict:
+				items.append(item)
+
+		return (items if len(items) > 0 else None)
+
+	def openFiles(self, items):
+		files = ""
+		for item in items:
+			files += "{0} ".format(item.line)
+
+		print files
+		os.system("vim {0}".format(files))
+
+# end GitMerge
+
+_lineMatch = re.compile("(.*?)([\w]+[.][\w]+)")
+
+def processLine(match):
+	return match.group(2)
+
+class ConflictItem:
+	def __init__(self, line):
+		self.line = ""
+
+		if "both modified" in line:
+			self.hasConflict = True
+			self.line = _lineMatch.sub(processLine, line).rstrip()
+		else:
+			self.hasConflict = False
+
+# end ConflictItem
+
+value = canStart()
+if value != 0:
+	exit(value)
+
+merge = GitMerge()
+merge.start()
