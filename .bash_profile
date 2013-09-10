@@ -12,6 +12,7 @@ alias rebase='git rebase -i origin/master'
 alias add='git add'
 alias commit='git commit -m'
 alias push='git push'
+alias pull='git pull'
 
 ##
 # Your previous /Users/mallarke/.bash_profile file was backed up as /Users/mallarke/.bash_profile.macports-saved_2012-06-24_at_17:22:32

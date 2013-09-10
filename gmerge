@@ -21,18 +21,18 @@ def canStart():
 	for i in output.readlines():
 		if "modified" in i:
 			return UNCOMMITED_CHANES
-		
+
 	return 0
 
 def exit(code=UNKNOWN_ERROR):
 	message = None
 
 	if code == UNCOMMITED_CHANES:
-		print "you need to let me know what branch you would like to merge."
+		print "You have uncommited items.  add and commit your items first."
 		sys.exit(UNCOMMITED_CHANES)
 
 	if code == UNKNOWN_BRANCH:
-		print "You have uncommited items.  add and commit your items first."
+		print "you need to let me know what branch you would like to merge."
 		sys.exit(UNKNOWN_BRANCH)
 
 	print "unkown error occured."
@@ -40,7 +40,16 @@ def exit(code=UNKNOWN_ERROR):
 
 class GitMerge:
 	def __init__(self):
-		self.branchName = sys.argv[1]
+		branch = None
+
+		value = sys.argv[1]
+
+		if value == "-r":
+			self.isRebase = True;
+			self.branchName = sys.argv[2]
+		else:
+			self.isRebase = False
+			self.branchName = value
 
 	def start(self):
 		self.switchToMaster()
@@ -57,6 +66,10 @@ class GitMerge:
 				self.openFiles(items)
 				os.system("git add -A")
 				os.system("git rebase --continue")
+
+		if self.isRebase:
+			self.switchToBranch()
+			sys.exit(0)
 
 		os.system("git push --force origin {0}".format(self.branchName))
 		self.switchToMaster()
