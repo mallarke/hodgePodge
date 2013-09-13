@@ -1,0 +1,428 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+import re
+
+if len(sys.argv) < 3:
+	sys.exit("You must supply the project that you would like parsed.")
+
+
+project = None
+
+for i in range(0, len(sys.argv)):
+	arg = sys.argv[i]
+
+	if arg == "--project":
+		project = sys.argv[i + 1]
+
+if project is None:
+	sys.exit("You must supply the project as an argument.  i.e. --project #Name")
+
+STARTING_PATH = os.getcwd()
+WORKING_PATH = os.path.join(STARTING_PATH, project)
+RES_PATH = os.path.join(WORKING_PATH, "res")
+SRC_PATH = os.path.join(WORKING_PATH, "src")
+
+DRAWABLE_XHDPI = "drawable-xhdpi"
+DRAWABLE_HDPI = "drawable-hdpi"
+DRAWABLE_MDPI = "drawable-mdpi"
+DRAWABLE_LDPI = "drawable-ldpi"
+
+SUPPORTED_DRAWABLES = [ DRAWABLE_XHDPI, DRAWABLE_HDPI, DRAWABLE_MDPI, DRAWABLE_LDPI ]
+
+JAVA_DRAWABLE_MATCH = r"(.+R.drawable.)([\w]+)(.+)"
+XML_DRAWABLE_MATCH = r"(.+@drawable/)([\w]+)(.+)"
+
+FILE_REPORT_NAME = "imageCheck_{0}.html".format(project)
+
+BLUE_COLOR = "#9BF7EF"
+RED_COLOR = "#FF6060"
+
+class ImageInfo:
+	def __init__(self):
+		self.title = None
+		self.directories = []
+		self.files = []
+
+	#end __init__
+
+	def isReferenced(self):
+		return len(self.files) > 0
+	#end isReferenced
+
+	def inDirectory(self, directory):
+		for d in self.directories:
+			if directory == d:
+				return True
+
+		return False
+
+	#end inDirectory
+
+	def getFiles(self):
+		files = ""
+
+		count = len(self.files)
+		for i in range(0, count):
+			f = self.files[i]
+			files += f.title
+
+			if i < (count - 1):
+				files += ", "
+
+		return files
+
+	#end getFiles
+
+	def addFile(self, f):
+		self.files.append(f)
+	#end addFile
+
+	def addDirectory(self, d):
+		self.directories.append(d)
+	#end addDirectory
+
+	def __repr__(self):
+		return "ImageInfo()"
+	#end __repr__
+
+	def __str__(self):
+		directories = ""
+		for d in self.directories:
+			directories += "{0}\n".format(d)
+
+		files = ""
+		for f in self.files:
+			files += "{0}\n".format(f)
+
+		return "title:\n{0}\n\ndirectories:\n{1}\n\nfiles:\n{2}\n\n".format(self.title, directories, files)
+	#end __str__
+
+#end ImageInfo
+
+class FileInfo:
+	def __init__(self):
+		self.title = None
+		self.directory = None
+		self.images = []
+
+	#end __init__
+
+	def addImage(self, image):
+		self.images.append(image)
+
+	#end addImage
+
+	def hasImage(self, name):
+		for image in self.images:
+			if image == name:
+				return True
+
+		return False
+
+	#end hasImage
+
+	def hasImages(self):
+		return (len(self.images) > 0)
+
+	def __repr__(self):
+		return "ImageInfo()"
+	#end __repr__
+
+	def __str__(self):
+		images = ""
+		for f in self.images:
+			images += "{0}\n".format(f)
+
+		return "title:\n{0}\n\ndirectory:\n{1}\n\nimages:\n{2}\n\n".format(self.title, self.directory, images)
+	#end __str__
+	
+#end FileInfo
+
+class ImageManager:
+	def __init__(self):
+		self.images = []
+		self.loadImages()
+
+	#end __init__
+
+	def process(self):
+		javaFileManager = FileManager(SRC_PATH, "java", JAVA_DRAWABLE_MATCH)
+		xmlFileManager = FileManager(RES_PATH, "xml", XML_DRAWABLE_MATCH)
+
+		self.appendFiles(javaFileManager)
+		self.appendFiles(xmlFileManager)
+	#end process
+
+	def loadImages(self):
+		self.images = []
+
+		for drawables in SUPPORTED_DRAWABLES:
+			path = os.path.join(RES_PATH, drawables)
+
+			for root, dirs, files in os.walk(path):
+				for f in files:
+					if not "png" in f:
+						continue
+					
+					image = self.getImage(f)
+					if image is None:
+						image = ImageInfo()
+						image.title = f
+						self.images.append(image)
+
+					image.addDirectory(drawables)
+		#end for
+
+		self.sortImages()
+
+	#end loadImages
+
+	def appendFiles(self, fileManager):
+		for imageInfo in self.images:
+			for fileInfo in fileManager.references:
+				if fileInfo.hasImage(imageInfo.title):
+					imageInfo.addFile(fileInfo)
+
+	#end appendFiles
+
+	def getImage(self, name):
+		for image in self.images:
+			if image.title == name:
+				return image
+
+		return None
+
+	#end getImage
+
+	def sortImages(self):
+		names = []
+		for image in self.images:
+			names.append(image.title)
+
+		names = sorted(names)
+
+		sortedImages = []
+
+		for name in names:
+			image = self.getImage(name)
+			sortedImages.append(image)
+
+		self.images = sortedImages
+	
+	#end sortImages
+
+#end ImageDetector
+
+class FileManager:
+	def __init__(self, path, fileExtension, match):
+		self.references = []
+		self.path = path
+		self.fileExtension = fileExtension
+		self.match = match
+
+		self.findRefsInPath()
+	#end __init__
+
+	def fileAtIndex(self, index):
+		if index >= 0 and index < len(self.references):
+			return self.references[index]
+
+		return None
+	
+	#end fileAtIndex
+
+	def findRefsInPath(self):
+		refs = []
+
+		for root, dirs, files in os.walk(self.path):
+			for f in files:
+				if not self.fileExtension in f or "bin" in root or "gen" in root:
+					continue
+				
+				filePath = os.path.join(root, f)
+				self.readFile(filePath)
+
+	#end findRefsInPath
+
+	def readFile(self, path):
+		fileInfo = self.getFileInfo(path)
+
+		with open(path) as f:
+			for line in f:
+				line = line.rstrip("\n")
+
+				result = self.getImageName(line)
+				if result is not None:
+					fileInfo.addImage(result)
+
+			if fileInfo.hasImages():
+				self.references.append(fileInfo)
+	
+	#end readFile
+
+	def getFileInfo(self, path):
+		values = path.split("/")
+
+		title = values[-1]
+		directory = path.replace(WORKING_PATH, "")
+		directory = directory.replace(title, "")
+		directory = directory.replace("/", "", 1)
+
+		info = FileInfo()
+		info.title = title
+		info.directory = directory
+
+		return info
+	
+	#end getFileInfo
+
+	def getImageName(self, line):
+		match = re.match(self.match, line, re.M|re.I)
+		if match is None or len(match.group()) < 3:
+			return None
+
+		name = "{0}.png".format(match.group(2))
+
+		return name
+
+	#end getImageName
+
+#end FileManager
+
+class HTMLEditor:
+	def __init__(self, imageList):
+		self.imageList = imageList
+	#end __init__
+
+	def write(self):
+		self.writeFile()
+		self.addFileToIgnore()
+
+	def writeFile(self):
+		path = os.path.join(STARTING_PATH, FILE_REPORT_NAME)
+		path_temp = os.path.join(STARTING_PATH, "{0}_temp".format(FILE_REPORT_NAME))
+
+		with open(path_temp, "w") as f:
+			self.writeLine(f, 0, "h1", True, "Image check for {0}".format(project))
+
+			headerItems = [ "Name", "isUsed" ]
+			headerItems.extend(SUPPORTED_DRAWABLES)
+			headerItems.append("Files")
+
+			self.addTable(f)
+			self.addHeaderRow(f, headerItems)
+
+			for info in self.imageList:
+				items = [ info.title , info.isReferenced() ]
+
+				for drawable in SUPPORTED_DRAWABLES:
+					items.append(info.inDirectory(drawable))
+
+				items.append(info.getFiles())
+				self.addRow(f, items)
+
+			self.closeTable(f)
+
+		os.system("mv {0} {1}".format(path_temp, path))
+		#for info in self.images:
+			
+
+	#end writeFile
+
+	def addFileToIgnore(self):
+		path = os.path.join(STARTING_PATH, ".gitignore")
+
+		if not os.path.exists(path):
+			return
+
+		path_temp = os.path.join(STARTING_PATH, ".gitignore_temp")
+		lines = []
+		
+		with open(path) as f:
+			for line in f:
+				lines.append(line)
+
+				if FILE_REPORT_NAME in line:
+					return
+
+			lines.append("\n")
+			lines.append("# image check text for project {0}\n".format(project))
+			lines.append(FILE_REPORT_NAME + "\n")
+
+		with open(path_temp, "w") as f:
+			for line in lines:
+				f.write(line)
+
+		os.system("mv {0} {1}".format(path_temp, path))
+
+	#end addFileToIgnore
+
+	def addTable(self, f):
+		self.writeLine(f, 0, "table border='1'", False, None)
+	#end addTable
+
+	def closeTable(self, f):
+		self.writeLine(f, 0, "/table", False, None)
+	#end closeTable
+
+	def addHeaderRow(self, f, titles):
+		self.writeLine(f, 1, "tr", False, None)
+
+		for title in titles:
+			self.writeLine(f, 2, "th", True, title)
+
+		self.writeLine(f, 1, "/tr", False, None)
+
+	#end addHeaderRow
+
+	def addRow(self, f, items):
+		self.writeLine(f, 1, "tr", False, None)
+
+		for item in items:
+			attrTitle = None
+			attrValue = None
+
+			if isinstance(item, bool):
+				attrTitle = "bgcolor"
+				attrValue = (BLUE_COLOR if item else RED_COLOR)
+
+			self.writeLineWithAttr(f, 2, "td", True, item, attrTitle, attrValue)
+
+		self.writeLine(f, 1, "/tr", False, None)
+	#end addRow
+	
+	def writeLine(self, f, numberOfTabs, tag, hasClose, string):
+		self.writeLineWithAttr(f, numberOfTabs, tag, hasClose, string, None, None)
+	#end writeLineToFile
+
+	def writeLineWithAttr(self, f, numberOfTabs, tag, hasClose, string, attrTitle, attrValue):
+		for i in range(0, numberOfTabs):
+			f.write("\t")
+		
+		f.write("<{0}".format(tag))
+
+		if attrTitle is not None and attrValue is not None:
+			f.write(" {0}='{1}'".format(attrTitle, attrValue))
+
+		f.write(">")
+
+		if string is not None:
+			f.write(str(string))
+
+		if hasClose:
+			f.write("</{0}>".format(tag))
+
+		f.write("\n")
+	#end writeLineWithAttr
+
+#end HTMLEditor
+
+imageManager = ImageManager()
+imageManager.process()
+
+editor = HTMLEditor(imageManager.images)
+editor.write()
+
