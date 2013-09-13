@@ -32,10 +32,11 @@ DRAWABLE_LDPI = "drawable-ldpi"
 
 SUPPORTED_DRAWABLES = [ DRAWABLE_XHDPI, DRAWABLE_HDPI, DRAWABLE_MDPI, DRAWABLE_LDPI ]
 
-JAVA_DRAWABLE_MATCH = r"(.+R.drawable.)([\w]+)(.+)"
-XML_DRAWABLE_MATCH = r"(.+@drawable/)([\w]+)(.+)"
+JAVA_DRAWABLE_MATCH = r"(.+R.drawable.)([\w_]+)(.+)"
+XML_DRAWABLE_MATCH = r"(.+@drawable/)([\w_]+)(.+)"
 
 FILE_REPORT_NAME = "imageCheck_{0}.html".format(project)
+R_DRAWABLE = "R.drawable."
 
 BLUE_COLOR = "#9BF7EF"
 RED_COLOR = "#FF6060"
@@ -49,12 +50,12 @@ class ImageInfo:
 	#end __init__
 
 	def isReferenced(self):
-		return len(self.files) > 0
+		return (len(self.files) > 0)
 	#end isReferenced
 
 	def inDirectory(self, directory):
 		for d in self.directories:
-			if directory == d:
+			if directory in d:
 				return True
 
 		return False
@@ -116,6 +117,8 @@ class FileInfo:
 	#end addImage
 
 	def hasImage(self, name):
+		name = name.replace(".9", "")
+
 		for image in self.images:
 			if image == name:
 				return True
@@ -144,11 +147,11 @@ class FileInfo:
 class ImageManager:
 	def __init__(self):
 		self.images = []
-		self.loadImages()
 
 	#end __init__
 
 	def process(self):
+		self.loadImages()
 		javaFileManager = FileManager(SRC_PATH, "java", JAVA_DRAWABLE_MATCH)
 		xmlFileManager = FileManager(RES_PATH, "xml", XML_DRAWABLE_MATCH)
 
@@ -173,12 +176,36 @@ class ImageManager:
 						image.title = f
 						self.images.append(image)
 
-					image.addDirectory(drawables)
+					imagePath = os.path.join(RES_PATH, drawables)
+					imagePath = os.path.join(imagePath, image.title)
+					image.addDirectory(imagePath)
 		#end for
 
 		self.sortImages()
 
 	#end loadImages
+
+	def hasUnusedImages(self):
+		for image in self.images:
+			if not image.isReferenced():
+				return True
+
+		return False
+
+	#end hasUnusedImages
+
+	def pruneUnusedImages(self):
+		paths = []
+
+		for image in self.images:
+			if not image.isReferenced():
+				for directory in image.directories:
+					paths.append(directory)
+					
+		for path in paths:
+			os.system("rm {0}".format(path))
+			
+	#end pruneUnusedImages
 
 	def appendFiles(self, fileManager):
 		for imageInfo in self.images:
@@ -254,9 +281,12 @@ class FileManager:
 			for line in f:
 				line = line.rstrip("\n")
 
-				result = self.getImageName(line)
-				if result is not None:
-					fileInfo.addImage(result)
+				if self.isTernary(line):
+					self.parseTernary(fileInfo, line)
+				else:
+					result = self.getImageName(line)
+					if result is not None:
+						fileInfo.addImage(result)
 
 			if fileInfo.hasImages():
 				self.references.append(fileInfo)
@@ -279,13 +309,26 @@ class FileManager:
 	
 	#end getFileInfo
 
+	def isTernary(self, line):
+		return (line.count(R_DRAWABLE) > 1)
+
+	def parseTernary(self, fileInfo, line):
+		items = line.split(R_DRAWABLE)
+
+		for i in range(1, len(items)):
+			name = items[i]
+			name = re.sub(r"([^\w]+)", "", name)
+			name += ".png"
+
+			fileInfo.addImage(name)
+
 	def getImageName(self, line):
 		match = re.match(self.match, line, re.M|re.I)
+
 		if match is None or len(match.group()) < 3:
 			return None
 
 		name = "{0}.png".format(match.group(2))
-
 		return name
 
 	#end getImageName
@@ -422,6 +465,15 @@ class HTMLEditor:
 
 imageManager = ImageManager()
 imageManager.process()
+
+if imageManager.hasUnusedImages():
+	response = raw_input("Would you like to remove unused images? ")
+	response = response.lower()
+
+	if response == "y" or response == "yes":
+		imageManager.pruneUnusedImages()
+		imageManager.process()
+
 
 editor = HTMLEditor(imageManager.images)
 editor.write()
