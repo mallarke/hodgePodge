@@ -194,7 +194,7 @@ class ImageManager:
 
 	#end hasUnusedImages
 
-	def pruneUnusedImages(self):
+	def deleteUnusedImages(self):
 		paths = []
 
 		for image in self.images:
@@ -205,7 +205,9 @@ class ImageManager:
 		for path in paths:
 			os.system("rm {0}".format(path))
 			
-	#end pruneUnusedImages
+		self.process()
+
+	#end deleteUnusedImages
 
 	def appendFiles(self, fileManager):
 		for imageInfo in self.images:
@@ -471,9 +473,7 @@ if imageManager.hasUnusedImages():
 	response = response.lower()
 
 	if response == "y" or response == "yes":
-		imageManager.pruneUnusedImages()
-		imageManager.process()
-
+		imageManager.deleteUnusedImages()
 
 editor = HTMLEditor(imageManager.images)
 editor.write()
