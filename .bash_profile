@@ -13,11 +13,11 @@ export PATH=/Applications/MacVim.app/:$PATH
 export SVN_EDITOR=vim
 
 alias status='git status'
-alias checkout='git checkout'
+alias co='git checkout'
 alias rebase='git rebase -i origin/master'
 alias add='git add'
 alias addAll='git add -A'
-alias commit='git commit -m'
+alias ci='git commit -m'
 alias push='git push'
 alias pull='git pull'
 
