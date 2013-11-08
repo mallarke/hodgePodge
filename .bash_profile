@@ -1,8 +1,14 @@
 export CLICOLOR=1
 export LSCOLORS=ExFxCxDxBxegedabagacad
 
+export ANDROID_HOME=/Applications/Android\ Studio.app/sdk
+
 export PATH=~/bin:$PATH
-export PATH=~/Downloads/android-sdk-macosx/tools:$PATH
+
+export PATH=$ANDROID_HOME:$PATH
+export PATH=$ANDROID_HOME/platform-tools:$PATH
+export PATH=$ANDROID_HOME/tools:$PATH
+
 export PATH=/Applications/MacVim.app/:$PATH
 export SVN_EDITOR=vim
 
@@ -10,6 +16,7 @@ alias status='git status'
 alias checkout='git checkout'
 alias rebase='git rebase -i origin/master'
 alias add='git add'
+alias addAll='git add -A'
 alias commit='git commit -m'
 alias push='git push'
 alias pull='git pull'
