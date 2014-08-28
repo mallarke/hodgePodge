@@ -4,6 +4,7 @@ export LSCOLORS=ExFxCxDxBxegedabagacad
 
 export ANDROID_HOME=/Applications/Android\ Studio.app/sdk
 
+export PATH=~/usr/local/bin:$PATH
 export PATH=~/bin:$PATH
 export PATH=/Applications/MacVim-snapshot-72:$PATH
 
@@ -23,6 +24,10 @@ alias addAll='git add -A'
 alias ci='git commit -m'
 alias push='git push'
 alias pull='git pull'
+
+if [ -f `brew --prefix`/etc/bash_completion ]; then
+    . `brew --prefix`/etc/bash_completion
+fi
 
 function switchgit 
 {
@@ -48,6 +53,33 @@ function restartadb
 {
 	adb kill-server
 	adb devices
+}
+
+function turtle() {
+	for arg; do
+		git checkout develop
+		git pull origin develop
+		branches=($(git branch --list *-$arg*))
+		for branch in ${branches[@]}; do
+			git checkout $branch
+			read -r -p "Rebase $branch onto develop? [y/N] " shouldRebase
+			if [[ $shouldRebase =~ ^([yY][eE][sS]|[yY])$ ]] 
+			then
+				git rebase origin/develop
+				git push -f origin $branch
+				echo "Rebased."
+
+                                read -r -p "Merge $branch into develop and clean up? [y/n] " shouldMerge
+                                if [[ $shouldMerge =~ ^([yY][eE][sS]|[yY])$ ]] 
+                                then
+                                    git checkout develop
+                                    git merge $branch
+                                    git push origin develop
+                                    git branch -D $branch
+                                fi
+			fi
+		done
+	done
 }
 
 alias ladb='adb devices'

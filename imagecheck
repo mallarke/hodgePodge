@@ -25,12 +25,12 @@ WORKING_PATH = os.path.join(STARTING_PATH, project)
 RES_PATH = os.path.join(WORKING_PATH, "res")
 SRC_PATH = os.path.join(WORKING_PATH, "src")
 
+DRAWABLE_XXHDPI = "drawable-xxhdpi"
 DRAWABLE_XHDPI = "drawable-xhdpi"
 DRAWABLE_HDPI = "drawable-hdpi"
 DRAWABLE_MDPI = "drawable-mdpi"
-DRAWABLE_LDPI = "drawable-ldpi"
 
-SUPPORTED_DRAWABLES = [ DRAWABLE_XHDPI, DRAWABLE_HDPI, DRAWABLE_MDPI, DRAWABLE_LDPI ]
+SUPPORTED_DRAWABLES = [ DRAWABLE_XXHDPI, DRAWABLE_XHDPI, DRAWABLE_HDPI, DRAWABLE_MDPI ]
 
 JAVA_DRAWABLE_MATCH = r"(.+R.drawable.)([\w_]+)(.+)"
 XML_DRAWABLE_MATCH = r"(.+@drawable/)([\w_]+)(.+)"

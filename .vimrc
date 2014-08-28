@@ -5,8 +5,9 @@ endif
 
 syn on
 set autoindent
-set tabstop=4
+set softtabstop=4
 set shiftwidth=4
+set expandtab
 
 set noswapfile
 
@@ -19,5 +20,3 @@ set number
 
 set nowrap
 set ruler
-
-map ;j :5<Enter><S-v><S-g>kky:bn<Enter><S-g>kkp:wq<Enter>
